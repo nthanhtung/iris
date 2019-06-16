@@ -1,0 +1,142 @@
+---
+title: "iris"
+author: "Nguyen Thanh Tung"
+date: "6/16/2019"
+output:
+  pdf_document:
+    number_sections: yes
+    toc: yes
+    toc_depth: 3
+  word_document:
+    toc: yes
+    toc_depth: '3'
+  html_document:
+    df_print: paged
+    toc: yes
+    toc_depth: '3'
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+# Introduction
+## Describe the dataset
+
+  The Iris flower data set or Fisher's Iris data set is a multivariate data set introduced by the British statistician and biologist Ronald Fisher in his 1936 paper The use of multiple measurements in taxonomic problems as an example of linear discriminant analysis.[1] It is sometimes called Anderson's Iris data set because Edgar Anderson collected the data to quantify the morphologic variation of Iris flowers of three related species.[2] Two of the three species were collected in the Gaspé Peninsula "all from the same pasture, and picked on the same day and measured at the same time by the same person with the same apparatus".[3]
+
+  The data set consists of 50 samples from each of three species of Iris (Iris setosa, Iris virginica and Iris versicolor). Four features were measured from each sample: the length and the width of the sepals and petals, in centimeters. Based on the combination of these four features, Fisher developed a linear discriminant model to distinguish the species from each other.
+  
+  For this challenge, I use "iris" data from R. "iris" is a data frame with 150 cases (rows) and 5 variables (columns) named Sepal.Length, Sepal.Width, Petal.Length, Petal.Width, and Species.
+  
+```{r}
+#Necessary Package for the challenge
+library(caret)
+library(dplyr)
+library(dslabs)
+library(ggplot2)
+library(corrplot)
+library(reshape)
+library(pastecs)
+
+#load data
+data("iris")
+str(iris)
+head(iris)
+```
+  
+
+## Goal of the project
+
+  The goal of the project is buidling a machine learning model to predict the species based on given information: Sepal.Length, Sepal.Width, Petal.Length, Petal.Width.
+  
+  The accuracy metric to measure the performance of the model is $$ Accuracy = \frac{Number\ of\ True\ prediction 
+}{Number\ of\ Total\ prediction} $$
+
+
+# Analysis
+## Data exploration method & Insights collected
+### Summary statistic
+
+#data exploration
+
++ Summary statistic of variables:
+```{r}
+summary(iris)
+
+```
++ From the summary statistic, we can see that the scale of variables is different. We should normalize data.
+```{r}
+iris_norm <- data.frame("Species" = iris[,5] ,apply(iris[, 1:4], 2, function(x) (x - min(x))/(max(x)-min(x))))
+stat.desc(iris_norm)
+```
++ Variable correlation, some variable are highly correlated, which may cause collinearity and lower the performance of the model
+```{r}
+iris_exclude_species <- iris_norm %>%
+  subset(select = -c(1))
+corrplot(cor(iris_exclude_species))
+```
+
+### Visualization & insights collected
+
++ Distribution of multiple varaibles with boxplot and scatter plot
+```{r}
+iris_norm %>% 
+  melt(id = "Species") %>% 
+  ggplot(aes(x = variable, y = value, color = Species)) +
+  geom_jitter(width = 0.05)
+
+iris_norm %>% 
+  melt(id = "Species") %>% 
+  ggplot(aes(x = variable, y = value, color = Species)) +
+  geom_boxplot()
+```
++ Insight collected: Petal.Width and Sepal.Width are two variable which have high variace and low correlation
+
+## Modelling approach
+### Create train set & test set
+
+```{r}
+#create train set & test set
+index <- createDataPartition(iris$Species, times = 1, p = 0.8, list = FALSE)
+train_set <- iris[index,]
+test_set <- iris[-index,]
+str(train_set)
+str(test_set)
+
+```
+
+### Naive bayes method for top 2 predictor with highest variability and have low correlation
+
+```{r}
+fit <- train(Species ~ Petal.Width + Sepal.Width, data = train_set, method = "nb")
+fit
+varImp(fit)
+y_hat <- predict(fit, newdata = test_set)
+
+ac1 <- mean(y_hat == test_set$Species)
+result <- data.frame("method" = "naive bayes top 2 predictor", "accuracy" = ac1)
+result
+```
+
+
+### Naive bayes method for all predictor
+
+```{r}
+fit <- train(Species ~ ., data = train_set, method = "nb")
+fit
+varImp(fit)
+y_hat <- predict(fit, newdata = test_set)
+ac2 <- mean(y_hat == test_set$Species)
+result <- rbind(result,
+                data.frame("method" = "naive bayes all predictor", "accuracy" = ac2))
+result
+```
+
+
+# Result
+  Using simple method with just two predictor with high variace and low correlation provides very good result of 93% accuracy. Include all predictor only improve accuracy 3% to 96%.
+
+# Conclusion
+  The study has gone through 4 key steps: data processing, data exploration, modelling, result. The model Naive bayes method for all predictor provides good accuracy of 96%.
